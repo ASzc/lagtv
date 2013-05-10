@@ -1,3 +1,112 @@
+# Install
+
+## Arch Linux
+
+Install general dependencies
+
+    # pacman -S git base-devel
+
+Install nokogiri dependencies
+
+    # pacman -S libxml2 libxslt
+
+Install pg dependencies
+
+    # pacman -S postgresql-libs
+
+Install a runtime for execjs
+
+    # pacman -S nodejs
+
+Set up user and ruby environment
+
+    # useradd -m lagtv
+    # su - lagtv
+    $ curl -L get.rvm.io | bash -s stable
+    $ source ~/.rvm/scripts/rvm
+    $ rvm install ruby-2.0.0-p0
+    $ rvm use ruby-2.0.0-p0
+    $ rvm gemset create lagtv
+    $ rvm gemset use lagtv
+    $ gem install bundler
+
+Clone repo, nuke old version files, copy example configs
+
+    $ git clone git://github.com/andypike/lagtv.git
+    $ echo -e 'rvm use ruby-2.0.0-p0\nrvm gemset use lagtv' >| lagtv/.rvmrc
+    $ rm lagtv/Gemfile.lock
+    $ cd lagtv
+      yes
+    $ cd config
+    $ for conf_file in *example*; do cp $conf_file $(echo "$conf_file" | sed -e 's/.example//'); done
+    $ cd ..
+
+Refresh secrets with some non-production quality random data
+
+    $ alias rnd='cat /dev/urandom | tr -dc A-Za-z0-9_ | head -c100'
+    $ for key in is_human_salt secret_token; do sed -i -e "s/^$key:.*$/$key: \"$(rnd)\" /" config/application.yml; done
+
+Get dependencies, install dependencies
+
+    $ bundle
+    $ bundle install
+    $ ^D
+
+Set up postgresql and add db bootstrap user
+
+    # pacman -S postgresql
+    # systemd-tmpfiles --create postgresql.conf
+    # mkdir /var/lib/postgres/data
+    # chown -c -R postgres:postgres /var/lib/postgres
+    # su - postgres
+    $ initdb -D '/var/lib/postgres/data'
+    $ ^D
+    # systemctl start postgresql
+    # systemctl enable postgresql
+    # su - postgres
+    $ psql -d postgres
+    > create role lagtv login createdb;
+    > ^D
+    $ ^D
+
+Set up redis (for use by resque)
+
+    # pacman -S redis
+    # systemctl start redis
+    # systemctl enable redis
+
+Init databases and execute the server
+
+    # su - lagtv
+    $ cd lagtv
+    $ rake db:setup
+
+Registration will break if there are no users in the db due to use of .save over .save! in code, fix this
+
+    $ sed -i -e 's/@user\.save$/@user.save!/' app/controllers/users_controller.rb
+
+Execute the resque worker and the rails server
+
+    $ QUEUE=group_email rake environment resque:work &
+    $ rails s -d
+
+Check port 3000 of the host computer via HTTP, example: http://localhost:3000/
+Most distros will require iptables (firewall) configuration changes to allow remote access.
+
+Bootstrap an admin user after registering a normal user:
+
+    # su - postgres
+    $ psql -d lagtv_development
+    > select id,name,role,email from users;
+    > update users set role = 'admin' where email = 'test@example.com';
+    > ^D
+    $ ^D
+
+More psql: http://www.postgresql.org/docs/9.2/static/app-psql.html
+
+More SQL: http://www.postgresql.org/docs/9.2/static/sql-commands.html
+
+
 1. Install Postgres and start the service
   $ brew install postgresql
 
