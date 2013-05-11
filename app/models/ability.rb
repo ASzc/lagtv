@@ -6,6 +6,9 @@ class Ability
     if current_user
       if current_user.admin?
         can :manage, :all
+        cannot :override_password, User do |user|
+          user == current_user
+        end
       elsif current_user.community_manager?
         can :manage, User
         can :manage, Replay
@@ -16,6 +19,7 @@ class Ability
         cannot :change_status, User do |user|
           user.role == 'community_manager' || user.role == 'admin'
         end
+        cannot :override_password, User
         cannot :change_password, User do |user|
           user != current_user
         end
