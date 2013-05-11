@@ -31,6 +31,8 @@
               = f.input :email
               
               - if can? :change_password, @user
+                - if cannot? :override_password, @user
+                  = f.input :old_password
                 = f.input :password
                 = f.input :password_confirmation              
 
