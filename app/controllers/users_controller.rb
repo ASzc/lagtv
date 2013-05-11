@@ -72,12 +72,24 @@ class UsersController < ApplicationController
   def update
     @user = get_editable_user(params[:id])
     authorize! :edit, @user
-    
-    if @user.update_attributes(filtered_params)
+
+    error_msg = nil
+
+    setting_password_without_override = params[:password] && cannot? :override_password, @user
+
+    if setting_password_without_override && params[:old_password].nil?
+      error_msg = "You need to provide the old password when setting a new one."
+    elsif setting_password_without_override && ! user.authenticate(params[:old_password])
+      error_msg = "The old password you provided is not valid. Cannot set new password."
+    elsif @user.update_attributes(filtered_params)
       redirect_to profile_path(@user.profile_url), :notice => 'Profile has been updated'
     else
+      error_msg = "There was a problem saving your profile, scroll down to see the errors."
+    end
+
+    if error_msg
       prep_view
-      flash.now[:alert] = "There was a problem saving your profile, scroll down to see the errors."
+      flash.now[:alert] = error_msg
       render 'edit'
     end
   end
