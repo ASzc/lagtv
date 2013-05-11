@@ -75,11 +75,11 @@ class UsersController < ApplicationController
 
     error_msg = nil
 
-    setting_password_without_override = params[:password] && cannot? :override_password, @user
+    setting_password_without_override = !params[:user][:password].blank? && cannot?(:override_password, @user)
 
-    if setting_password_without_override && params[:old_password].nil?
+    if setting_password_without_override && params[:user][:old_password].blank?
       error_msg = "You need to provide the old password when setting a new one."
-    elsif setting_password_without_override && ! user.authenticate(params[:old_password])
+    elsif setting_password_without_override && ! @user.authenticate(params[:user][:old_password])
       error_msg = "The old password you provided is not valid. Cannot set new password."
     elsif @user.update_attributes(filtered_params)
       redirect_to profile_path(@user.profile_url), :notice => 'Profile has been updated'
@@ -124,6 +124,8 @@ class UsersController < ApplicationController
       if cannot?(:set_role, :admin) && params[:user][:role] == 'admin'
         filtered.delete(:role)
       end
+
+      filtered.delete(:old_password)
 
       filtered
     end
